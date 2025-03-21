@@ -9,39 +9,119 @@
 # <<<Adedamola Adejumobi>>>
 #
 #
+import datatier
+import awsutil
+import boto3     # AWS SDK
 
-import requests
+
+import requests  # calling web service
 import jsons
-
+from dotenv import load_dotenv
 
 import uuid
 import pathlib
 import logging
 import sys
 import os 
-import base64
-import time
 
 from configparser import ConfigParser
 
 
 
 
+
+def list_jobs(baseurl):
+    """
+        Function to list all the jobs on the web service
+    """
+    api = "/list"
+    url = baseurl + api
+    
+    res = requests.get(url)
+    
+    body = res.json()
+    
+    if not body:
+        print("No jobs found")
+        return
+
+    print("List of jobs:")
+    print("====================================")
+    for job in body['jobs']:
+        print("Job ID: ", job['jobid'])
+        print("Status: ", job['status'])
+        
+
+
+def status(baseurl):
+    """
+        Function to get the status of a job on the web service
+    """
+    user_input = input("Enter the job ID: ")
+    api = "/status"
+    url = baseurl + api + "/?jobid=" + user_input
+    
+    res = requests.get(url)
+    body = res.json()
+    
+    if not body:
+        print("No job found")
+        return
+
+    print("job ID: ", body['jobid'])
+    print("Status: ", body['status'])
+    return
+
+
 def upload():
     """
         Function to upload a podcast to the web service
     """
+    
     pass
-    
-    
 
 
 
-def download():
+def download(jobid):
     """
         Function to download a transcription from the web service
     """
-    pass
+    
+    user_input = input("Enter the job ID: ")
+    api = "/download"
+    url = baseurl + api + "/?jobid=" + user_input
+    
+    res = requests.get(url)
+    body = res.json()
+    
+    if not body:
+        print("No job found")
+        return
+
+    print("job ID: ", body['jobid'])
+    print("Status: ", body['status'])
+    
+    if body['status'] == "completed":
+        print("Transcription is available for download")
+        print("Downloading...")
+        
+        original_filename = body['original_filename']  
+        original_filename = original_filename.split(".")[0] + ".txt"
+        
+        txtfilename = original_filename
+        
+        
+        
+        with open(txtfilename, "w", endcoding='utf-8') as f:
+            f.write(transcript_text)
+
+        
+        print("Transcription downloaded to: ", txtfilename)
+    else:
+        print(f"Transcription not available for download. Current status: {body['status']}")
+        print("Try again later")
+        
+        
 
 
 
@@ -51,19 +131,16 @@ def prompt():
         0 - Exit
         1 - Upload
         2 - Download
+        3 - List
+        4 - Status
     """
-    
-    print("Enter a commmand::  ")
-    print("     0 - Exit")
-    print("     1 - Upload")
-    print("     2 - Download")
-    
-    
     try:
-        print("Enter a commmand::  ")
+        print("Enter a commmand:  ")
         print("     0 - Exit")
         print("     1 - Upload")
         print("     2 - Download")
+        print("     3 - List")
+        print("     4 - Status")
         
         command = int(input())
         return command
@@ -88,37 +165,36 @@ try:
     # removing traceback
     sys.tracebacklimit = 0
     
-    # Read configuration file
-    config_file = "vocalink-config.ini"
+    # initalizing config file
+    config_file = 'podcastapp-config.ini'
     
-    print("What Configuration file do you want to use?")
-    print("Default: vocalink-config.ini, Press Enter to use default")
-    print("Otherwise, enter the file name: ")   
-     
+    
+    print("What config file to use for this session?")
+    print("Press ENTER to use default (photoapp-config.ini),")
+    print("otherwise enter name of config file>")
     s = input()
-    if s != "":
-        pass
+
+    if s == "":  # use default
+      pass  # already set
     else:
-        config_file = s
-        
-    
+      config_file = s
+      
+      
+     #
+    # does config file exist?
     #
-    # vailidating configuration file
-    #
-    
     if not pathlib.Path(config_file).is_file():
-        print("Configuration file", config_file, "not found")
+      print("**ERROR: config file '", config_file, "' does not exist, exiting")
+      sys.exit(0)
+    
+    # loading environment variables    
+    load_dotenv()
+    baseurl = os.getenv("BASE_URL")
+    
+    if baseurl is None:
+        print("ERROR: BASE_URL not set")
         print("Exiting...")
         sys.exit(0)
-        
-    #
-    # Setup base URL to web service
-    #
-    
-    configur = ConfigParser()
-    configur.read(config_file)
-    baseurl = configur.get("client", "webservice")
-    
     
     #
     # cleaning up the base URL
@@ -126,12 +202,6 @@ try:
     
     if len(baseurl) < 16:
         print("Invalid base URL")
-        print("Exiting...")
-        sys.exit(0)
-    
-    if baseurl.startswith("https"):
-        print("ERROR: Invalid base URL")
-        print("ERROR: HTTPS not supported")
         print("Exiting...")
         sys.exit(0)
 
@@ -149,9 +219,13 @@ try:
     while cmd != 0:
         
         if cmd == 1:
-            upload()
+            upload(baseurl)
         elif cmd == 2:
-            download()
+            download(baseurl)
+        elif cmd == 3:
+            list_jobs(baseurl)
+        elif cmd == 4:
+            status(baseurl)
         else:
             print("Invalid command try a different command")    
         cmd = prompt()
